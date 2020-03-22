@@ -1,0 +1,1 @@
+drop table if exists doongji_upload_file;

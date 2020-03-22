@@ -1,27 +1,21 @@
 package com.jacknie.doongji.banksalad.model
 
-import org.springframework.data.jpa.repository.JpaRepository
-import javax.persistence.*
+import org.springframework.data.annotation.Id
+import org.springframework.data.repository.reactive.ReactiveCrudRepository
 
-@Entity(name = ENTITY_PREFIX + "UploadFile")
 data class UploadFile(
 
         @Id
-        @GeneratedValue(strategy = GenerationType.IDENTITY)
-        var id: Long,
+        var id: Long? = null,
 
-        @Column(length = 4096, nullable = false)
         var path: String,
 
-        @Column(length = 4096, nullable = false)
         var filename: String,
 
-        @Column(nullable = false)
         var filesize: Long,
 
-        @Column(nullable = false)
         var mimeType: String
 
-): Auditable()
+)
 
-interface UploadFileRepository: JpaRepository<UploadFile, Long>
+interface UploadFileRepository: ReactiveCrudRepository<UploadFile, Long>
