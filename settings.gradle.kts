@@ -8,3 +8,9 @@
  */
 
 rootProject.name = "doongji-api-banksalad"
+
+sourceControl {
+    gitRepository(uri("https://github.com/jacknie84/file-delivery.git")) {
+        producesModule("com.jacknie:file-delivery")
+    }
+}
