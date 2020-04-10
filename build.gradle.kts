@@ -30,6 +30,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
 
+    implementation("io.projectreactor.addons:reactor-extra:3.3.3.RELEASE")
     implementation("org.springframework.data:spring-data-r2dbc:1.0.0.RELEASE")
     implementation("io.r2dbc:r2dbc-h2:0.8.2.RELEASE")
     implementation("io.r2dbc:r2dbc-pool:0.8.1.RELEASE")

@@ -7,13 +7,9 @@ import com.jacknie.fd.FileDelivery
 import com.jacknie.fd.FileSource
 import com.jacknie.fd.fs.FsFileStoreSession
 import org.springframework.core.io.buffer.DataBuffer
-import org.springframework.http.ContentDisposition
-import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.util.StringUtils
-import org.springframework.web.reactive.function.server.ServerRequest
-import org.springframework.web.reactive.function.server.ServerResponse
-import org.springframework.web.reactive.function.server.queryParamOrNull
+import org.springframework.web.reactive.function.server.*
 import reactor.core.publisher.Mono
 import java.io.SequenceInputStream
 import java.util.*
@@ -24,9 +20,9 @@ class UploadFileHandler(
 
     fun put(request: ServerRequest): Mono<out ServerResponse> {
         val uploadPath = request.pathVariable("uploadPath").substring(1)
-        val contentLength = request.headers().contentLength().orElse(0L)
-        val contentType = request.headers().contentType().orElse(MediaType.APPLICATION_OCTET_STREAM)
-        val filename = extractFilenameAtQueryParam(request)?: extractFilenameAtHttpHeaders(request)?: "unknown"
+        val contentLength = request.headers().contentLengthOrNull()?: 0L
+        val contentType = request.headers().contentTypeOrNull()?: MediaType.APPLICATION_OCTET_STREAM
+        val filename = request.queryParamOrNull("filename")?: extractFilenameAtHttpHeaders(request)?: "unknown"
         return request.bodyToFlux(DataBuffer::class.java)
                 .map { it.asInputStream() }
                 .collectList()
@@ -40,12 +36,13 @@ class UploadFileHandler(
                         mimeType = contentType.toString()
                 ) }
                 .map { fileDelivery.put(FilePolicyImpl(), it) }
-                .flatMap { uploadFileRepository.save(UploadFile(
-                        path = it.run {"$path/$filename"},
+                .map { UploadFile(
+                        path = "${it.path}/${it.filename}",
                         filename = it.originalFilename,
                         mimeType = it.mimeType.toString(),
                         filesize = it.filesize
-                )) }
+                ) }
+                .flatMap { uploadFileRepository.save(it) }
                 .flatMap { ServerResponse.ok().bodyValue(it) }
     }
 
@@ -55,18 +52,4 @@ class UploadFileHandler(
                 .flatMap { ServerResponse.ok().bodyValue(it) }
     }
 
-    private fun extractFilenameAtHttpHeaders(request: ServerRequest): String? {
-        val headerParts = request.headers().header(HttpHeaders.CONTENT_DISPOSITION)
-        return if (headerParts.isNotEmpty()) {
-            val contentDisposition = ContentDisposition.parse(headerParts.joinToString(";"))
-            contentDisposition.filename
-        }
-        else {
-            null
-        }
-    }
-
-    private fun extractFilenameAtQueryParam(request: ServerRequest): String? {
-        return request.queryParamOrNull("filename")
-    }
 }
