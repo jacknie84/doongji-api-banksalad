@@ -7,9 +7,7 @@ data class SharedExcel(
 
         @Id
         var id: Long? = null,
-
         var uploadId: Long,
-
         var userId: String
 )
 

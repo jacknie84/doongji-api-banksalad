@@ -26,7 +26,7 @@ class R2dbcConfiguration: AbstractR2dbcConfiguration() {
     @Bean fun connectionFactoryInitializer(): ConnectionFactoryInitializer {
         val connectionFactoryInitializer = ConnectionFactoryInitializer()
         connectionFactoryInitializer.setConnectionFactory(connectionFactory())
-        connectionFactoryInitializer.setDatabaseCleaner(databaseCleaner())
+//        connectionFactoryInitializer.setDatabaseCleaner(databaseCleaner())
         connectionFactoryInitializer.setDatabasePopulator(databasePopulator())
         connectionFactoryInitializer.setEnabled(true)
         return connectionFactoryInitializer
