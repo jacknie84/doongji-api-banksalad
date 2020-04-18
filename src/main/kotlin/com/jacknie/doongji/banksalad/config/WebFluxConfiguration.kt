@@ -11,9 +11,11 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.data.r2dbc.core.DatabaseClient
+import org.springframework.web.reactive.config.CorsRegistry
 import org.springframework.web.reactive.config.EnableWebFlux
 import org.springframework.web.reactive.config.WebFluxConfigurer
 import org.springframework.web.reactive.function.server.router
+
 
 @Configuration
 @EnableWebFlux
@@ -53,5 +55,15 @@ class WebFluxConfiguration: WebFluxConfigurer {
                 GET("/{id}", householdAccountsHandler()::get)
             }
         }
+    }
+
+    override fun addCorsMappings(registry: CorsRegistry) {
+        registry.addMapping("/$version/**")
+                .allowedOrigins("*")
+                .allowedMethods("*")
+                .allowedHeaders("*")
+                .exposedHeaders("X-Total-Count", "Date", "Location")
+                .allowCredentials(true)
+                .maxAge(3600)
     }
 }

@@ -36,7 +36,7 @@ class R2dbcConfiguration: AbstractR2dbcConfiguration() {
 
     @Bean fun databasePopulator(): DatabasePopulator {
         val databasePopulator = CompositeDatabasePopulator()
-        databasePopulator.addPopulators(ResourceDatabasePopulator(ClassPathResource("/initializer/clean-db.sql")))
+//        databasePopulator.addPopulators(ResourceDatabasePopulator(ClassPathResource("/initializer/clean-db.sql")))
         databasePopulator.addPopulators(ResourceDatabasePopulator(ClassPathResource("/initializer/db-schema.sql")))
         return databasePopulator
     }
