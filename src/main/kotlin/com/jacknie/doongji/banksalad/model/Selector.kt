@@ -5,7 +5,7 @@ import org.springframework.data.domain.Sort
 data class Selector(
         var selectedFields: List<String>,
         var pagination: Pagination?,
-        var condition: Condition
+        var condition: Condition?
 )
 
 data class Pagination(

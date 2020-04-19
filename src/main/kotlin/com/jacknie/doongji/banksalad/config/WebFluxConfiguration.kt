@@ -2,9 +2,7 @@ package com.jacknie.doongji.banksalad.config
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.jacknie.doongji.banksalad.endpoint.*
-import com.jacknie.doongji.banksalad.model.HouseholdAccountsRepository
-import com.jacknie.doongji.banksalad.model.SharedExcelRepository
-import com.jacknie.doongji.banksalad.model.UploadFileRepository
+import com.jacknie.doongji.banksalad.model.*
 import com.jacknie.fd.FileDelivery
 import com.jacknie.fd.fs.FsFileStoreSession
 import org.springframework.beans.factory.annotation.Autowired
@@ -14,6 +12,7 @@ import org.springframework.data.r2dbc.core.DatabaseClient
 import org.springframework.web.reactive.config.CorsRegistry
 import org.springframework.web.reactive.config.EnableWebFlux
 import org.springframework.web.reactive.config.WebFluxConfigurer
+import org.springframework.web.reactive.function.server.ServerResponse
 import org.springframework.web.reactive.function.server.router
 
 
@@ -28,15 +27,19 @@ class WebFluxConfiguration: WebFluxConfigurer {
     @Autowired private lateinit var fileDelivery: FileDelivery<FsFileStoreSession>
     @Autowired private lateinit var sharedExcelRepository: SharedExcelRepository
     @Autowired private lateinit var householdAccountsRepository: HouseholdAccountsRepository
+    @Autowired private lateinit var retrievedConditionRepository: RetrievedConditionRepository
+    @Autowired private lateinit var retrievedConditionPredicateRepository: RetrievedConditionPredicateRepository
     @Bean fun uploadFileHandler() = UploadFileHandler(uploadFileRepository, fileDelivery)
     @Bean fun downloadFileHandler() = DownloadFileHandler(uploadFileRepository, fileDelivery)
     @Bean fun sharedExcelHandler() = SharedExcelsHandler(sharedExcelRepository)
     @Bean fun sharedExcelContentHandler() = SharedExcelContentHandler(householdAccountsRepository)
     @Bean fun householdAccountsHandler() = HouseholdAccountsHandler(client, householdAccountsRepository, objectMapper)
+    @Bean fun retrievedConditionHandler() = RetrievedConditionHandler(client, retrievedConditionRepository, retrievedConditionPredicateRepository, objectMapper)
 
     @Bean
     fun v1RouterFunction() = router {
         version.nest {
+            OPTIONS("/**") { ServerResponse.ok().build() }
             "/upload".nest {
                 PUT("/{*uploadPath}", uploadFileHandler()::put)
                 GET("/{uploadId}", uploadFileHandler()::get)
@@ -53,6 +56,14 @@ class WebFluxConfiguration: WebFluxConfigurer {
             "/household-accounts".nest {
                 GET("", householdAccountsHandler()::getList)
                 GET("/{id}", householdAccountsHandler()::get)
+            }
+            "/retrieved-conditions".nest {
+                POST("", retrievedConditionHandler()::post)
+                GET("", retrievedConditionHandler()::getList)
+                GET("/{id}", retrievedConditionHandler()::get)
+                PUT("/{id}", retrievedConditionHandler()::put)
+                PUT("/{conditionId}/predicates", retrievedConditionHandler()::putPredicates)
+                GET("/{conditionId}/predicates", retrievedConditionHandler()::getPredicates)
             }
         }
     }

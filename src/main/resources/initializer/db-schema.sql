@@ -25,3 +25,18 @@ create table if not exists doongji_household_accounts (
     use_object varchar(255),
     user_id  varchar(255)
 );
+
+create table if not exists doongji_retrieved_condition (
+    id identity primary key,
+    name varchar(255),
+    favorite boolean,
+    last_retrieved_date varchar(255)
+);
+
+create table if not exists doongji_retrieved_condition_predicate (
+    id identity primary key,
+    condition_id number,
+    field_name varchar(255),
+    operator varchar(255),
+    field_values varchar(255)
+);

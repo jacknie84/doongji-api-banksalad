@@ -11,7 +11,6 @@ class SharedExcelsHandler(private val sharedExcelRepository: SharedExcelReposito
     fun post(request: ServerRequest): Mono<out ServerResponse> {
         return request.bodyToMono(SharedExcel::class.java)
                 .flatMap { sharedExcelRepository.save(it) }
-                .doOnNext {  }
                 .map { request.uriBuilder().path("/{id}").build(it.id) }
                 .flatMap { ServerResponse.created(it).build() }
     }
