@@ -27,7 +27,7 @@ data class HouseholdAccounts(
 interface HouseholdAccountsRepository: ReactiveCrudRepository<HouseholdAccounts, Long> {
 
         @Query("""
-                select count(h.id) > 0
+                select *
                 from doongji_household_accounts h
                 where h.use_date = $1
                 and h.use_time = $2
@@ -36,7 +36,7 @@ interface HouseholdAccountsRepository: ReactiveCrudRepository<HouseholdAccounts,
                 and h.use_object = $5
                 and h.user_id = $6
         """)
-        fun existsByRecord(useDate: String?, useTime: String?, useAmount: Int?, useCurrency: String?, useObject: String?, userId: String): Mono<Boolean>
+        fun findByRecord(useDate: String?, useTime: String?, useAmount: Int?, useCurrency: String?, useObject: String?, userId: String): Mono<HouseholdAccounts>
 
         @Query("select * from doongji_household_accounts h where h.user_id = $1")
         fun findByUserId(userId: String): Flux<HouseholdAccounts>

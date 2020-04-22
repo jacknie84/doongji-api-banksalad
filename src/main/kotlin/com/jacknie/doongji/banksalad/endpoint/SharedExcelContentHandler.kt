@@ -12,7 +12,17 @@ class SharedExcelContentHandler(private val householdAccountsRepository: Househo
     fun put(request: ServerRequest): Mono<out ServerResponse> {
         val userId = request.pathVariable("userId")
         return request.bodyToFlux(HouseholdAccounts::class.java)
-                .filterWhen { not(householdAccountsRepository.existsByRecord(it.useDate, it.useTime, it.useAmount, it.useCurrency, it.useObject, userId)) }
+                .flatMap {
+                    householdAccountsRepository.findByRecord(it.useDate, it.useTime, it.useAmount, it.useCurrency, it.useObject, userId)
+                            .map { record ->
+                                record.type = it.type
+                                record.category = it.category
+                                record.subCategory = it.subCategory
+                                record.description = it.description
+                                record
+                            }
+                            .switchIfEmpty(Mono.just(it))
+                }
                 .flatMap { householdAccountsRepository.save(it) }
                 .then(ServerResponse.noContent().build())
     }
@@ -23,4 +33,5 @@ class SharedExcelContentHandler(private val householdAccountsRepository: Househo
                 .collectList()
                 .flatMap { ServerResponse.ok().bodyValue(it) }
     }
+
 }
