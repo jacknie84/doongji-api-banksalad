@@ -27,7 +27,7 @@ data class HouseholdAccounts(
 interface HouseholdAccountsRepository: ReactiveCrudRepository<HouseholdAccounts, Long> {
 
         @Query("""
-                select count(*) > 0
+                select count(h.id) > 0
                 from doongji_household_accounts h
                 where h.use_date = $1
                 and h.use_time = $2
