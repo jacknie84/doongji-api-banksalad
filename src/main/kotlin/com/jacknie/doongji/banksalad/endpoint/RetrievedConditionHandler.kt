@@ -3,6 +3,7 @@ package com.jacknie.doongji.banksalad.endpoint
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.jacknie.doongji.banksalad.model.*
+import org.jooq.generated.public_.Tables
 import org.springframework.data.r2dbc.core.DatabaseClient
 import org.springframework.data.r2dbc.core.isEquals
 import org.springframework.data.r2dbc.query.Criteria
@@ -11,6 +12,7 @@ import reactor.core.publisher.Mono
 import java.time.Instant
 
 class RetrievedConditionHandler(
+        private val modelRepository: ModelRepository,
         private val client: DatabaseClient,
         private val retrievedConditionRepository: RetrievedConditionRepository,
         private val retrievedConditionPredicateRepository: RetrievedConditionPredicateRepository,
@@ -27,8 +29,8 @@ class RetrievedConditionHandler(
     fun getList(request: ServerRequest): Mono<out ServerResponse> {
         val q = request.queryParamOrNull("q") ?: "{}"
         val selector = objectMapper.readValue<Selector>(q)
-        return findBySelector(client, selector, RetrievedCondition::class.java)
-                .flatMap { responseOf(it) }
+        val table = Tables.DOONGJI_RETRIEVED_CONDITION
+        return modelRepository.findAll(table, selector, RetrievedCondition::class.java).flatMap { responseOf(it) }
     }
 
     fun get(request: ServerRequest): Mono<out ServerResponse> {

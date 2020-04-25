@@ -5,6 +5,7 @@ import com.jacknie.doongji.banksalad.endpoint.*
 import com.jacknie.doongji.banksalad.model.*
 import com.jacknie.fd.FileDelivery
 import com.jacknie.fd.fs.FsFileStoreSession
+import org.jooq.DSLContext
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -21,7 +22,9 @@ import org.springframework.web.reactive.function.server.router
 class WebFluxConfiguration: WebFluxConfigurer {
 
     private val version = "v1"
+    @Autowired private lateinit var dslContext: DSLContext
     @Autowired private lateinit var client: DatabaseClient
+    @Autowired private lateinit var modelRepository: ModelRepository
     @Autowired private lateinit var objectMapper: ObjectMapper
     @Autowired private lateinit var uploadFileRepository: UploadFileRepository
     @Autowired private lateinit var fileDelivery: FileDelivery<FsFileStoreSession>
@@ -33,8 +36,9 @@ class WebFluxConfiguration: WebFluxConfigurer {
     @Bean fun downloadFileHandler() = DownloadFileHandler(uploadFileRepository, fileDelivery)
     @Bean fun sharedExcelHandler() = SharedExcelsHandler(sharedExcelRepository)
     @Bean fun sharedExcelContentHandler() = SharedExcelContentHandler(householdAccountsRepository)
-    @Bean fun householdAccountsHandler() = HouseholdAccountsHandler(client, householdAccountsRepository, objectMapper)
-    @Bean fun retrievedConditionHandler() = RetrievedConditionHandler(client, retrievedConditionRepository, retrievedConditionPredicateRepository, objectMapper)
+    @Bean fun householdAccountsHandler() = HouseholdAccountsHandler(modelRepository, householdAccountsRepository, objectMapper)
+    @Bean fun retrievedConditionHandler() = RetrievedConditionHandler(modelRepository, client, retrievedConditionRepository, retrievedConditionPredicateRepository, objectMapper)
+    @Bean fun statisticsHandler() = StatisticsHandler(dslContext, client, objectMapper)
 
     @Bean
     fun v1RouterFunction() = router {
@@ -64,6 +68,9 @@ class WebFluxConfiguration: WebFluxConfigurer {
                 PUT("/{id}", retrievedConditionHandler()::put)
                 PUT("/{conditionId}/predicates", retrievedConditionHandler()::putPredicates)
                 GET("/{conditionId}/predicates", retrievedConditionHandler()::getPredicates)
+            }
+            "/statistics".nest {
+                GET("/{groupBy}", statisticsHandler()::getGroupBy)
             }
         }
     }

@@ -3,7 +3,7 @@ package com.jacknie.doongji.banksalad.model
 import org.springframework.data.domain.Sort
 
 data class Selector(
-        var selectedFields: List<String>,
+        var selectedFields: List<String>?,
         var pagination: Pagination?,
         var condition: Condition?
 )

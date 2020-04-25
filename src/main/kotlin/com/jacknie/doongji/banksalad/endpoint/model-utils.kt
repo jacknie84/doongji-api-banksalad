@@ -1,90 +1,132 @@
 package com.jacknie.doongji.banksalad.endpoint
 
-import com.jacknie.doongji.banksalad.model.*
-import org.springframework.data.domain.*
-import org.springframework.data.r2dbc.core.DatabaseClient
-import org.springframework.data.r2dbc.core.isEquals
-import org.springframework.data.r2dbc.core.isIn
-import org.springframework.data.r2dbc.query.Criteria
-import reactor.core.publisher.Mono
-import java.util.stream.Collectors
+import com.jacknie.doongji.banksalad.model.Operator
+import com.jacknie.doongji.banksalad.model.Pagination
+import com.jacknie.doongji.banksalad.model.Predicate
+import com.jacknie.doongji.banksalad.model.Selector
+import org.jooq.*
+import org.jooq.generated.public_.tables.records.DoongjiHouseholdAccountsRecord
+import org.jooq.impl.TableImpl
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Pageable
+import org.springframework.data.domain.Sort
+import java.math.BigDecimal
 
-fun <T> findBySelector(client: DatabaseClient, selector: Selector, table: Class<T>): Mono<out Page<T>> {
-    val pageable = toPageable(selector.pagination?: Pagination(1, 10, null))
-    val criteria = toCriteria(selector.condition)
-    return client.select()
-            .from(table)
-            .project("id")
-            .matching(criteria)
-            .fetch().all()
-            .collect(Collectors.summingLong { 1 })
-            .filter { it > 0 }
-            .zipWith(client.select()
-                    .from(table)
-                    .project(*selector.selectedFields.map { it.toSnakeCase() }.toTypedArray())
-                    .page(pageable)
-                    .matching(criteria)
-                    .fetch().all().collectList())
-            .map { PageImpl(it.t2, pageable, it.t1) }
-            .defaultIfEmpty(PageImpl(emptyList(), pageable, 0))
+fun TableImpl<out Record>.selectedFields(selector: Selector): Collection<out SelectFieldOrAsterisk> = selector
+        .selectedFields
+        ?.map { field(it.toSnakeCase().toUpperCase()) }
+        ?: emptyList()
+
+fun TableImpl<out Record>.condition(selector: Selector): Condition {
+    val predicates = selector.condition?.predicates?: emptySet()
+    val conditions = predicates.map { condition(it) }
+    return conditions.reduce(Condition::and)
 }
 
-private fun toPageable(pagination: Pagination): Pageable {
-    val (page, size, orders) = pagination
-    val sort = Sort.by(orders?.map { Sort.Order(it.direction, it.property.toSnakeCase()) }?: emptyList())
+fun TableImpl<out Record>.condition(predicate: Predicate): Condition {
+    val (field, operator, values) = predicate
+    val tableField = field(field.toSnakeCase().toUpperCase())
+    return when (tableField.type) {
+        Long::class.java -> resolveLongCondition(tableField as TableField<DoongjiHouseholdAccountsRecord, Long>,
+                operator, values.map { it.toLong() })
+        BigDecimal::class.java -> resolveBigDecimalCondition(tableField as TableField<DoongjiHouseholdAccountsRecord, BigDecimal>,
+                operator, values.map { it.toBigDecimal() })
+        else -> resolveStringCondition(tableField as TableField<DoongjiHouseholdAccountsRecord, String>,
+                operator, values)
+    }
+}
+
+fun SelectOrderByStep<out Record>.pageable(pageable: Pageable, table: TableImpl<out Record>): SelectOrderByStep<out Record> {
+    if (pageable.sort.isSorted) {
+        pageable.sort.forEach {
+            val tableField = table.field(it.property.toSnakeCase().toUpperCase())
+            if (it.isDescending) {
+                orderBy(tableField.desc())
+            } else {
+                orderBy(tableField.asc())
+            }
+        }
+    }
+    if (pageable.isPaged) {
+        offset(pageable.offset).limit(pageable.pageSize)
+    }
+    return this
+}
+
+fun resolvePageable(selector: Selector): Pageable {
+    val (page, size, orders) = selector.pagination?: Pagination(1, 10, null)
+    val sort = Sort.by(orders?.map { Sort.Order(it.direction, it.property) }?: emptyList())
     return PageRequest.of(if (page > 0) page - 1 else page, size, sort)
 }
 
-private fun toCriteria(condition: Condition?): Criteria {
-    val predicates = condition?.predicates?.toList()
-    return if (predicates.isNullOrEmpty()) {
-        Criteria.where("id").isNotNull
-    }
-    else {
-        val criteria = Criteria.where(predicates[0].field).accept(predicates[0])
-        predicates.subList(1, predicates.size).fold(criteria) { acc, p -> acc.accept(p) }
+fun resolveLongCondition(tableField: TableField<DoongjiHouseholdAccountsRecord, Long>, operator: Operator, values: List<Long>): Condition {
+    return when(operator) {
+        Operator.IS_NULL -> tableField.isNull
+        Operator.IS_NOT_NULL -> tableField.isNotNull
+        Operator.EQUALS -> if (values.size == 1) {
+            tableField.eq(values[0])
+        } else {
+            tableField.`in`(values)
+        }
+        Operator.NOT_EQUALS -> if (values.size == 1) {
+            tableField.ne(values[0])
+        } else {
+            tableField.notIn(values)
+        }
+        Operator.IN -> tableField.`in`(values)
+        Operator.NOT_IN -> tableField.notIn(values)
+        Operator.GREATER_THAN -> values.map { tableField.gt(it) }.reduce(Condition::or)
+        Operator.GREATER_THAN_EQUALS -> values.map { tableField.ge(it) }.reduce(Condition::or)
+        Operator.LESS_THAN -> values.map { tableField.lt(it) }.reduce(Condition::or)
+        Operator.LESS_THAN_EQUALS -> values.map { tableField.le(it) }.reduce(Condition::or)
+        else -> throw IllegalStateException("unsupported operator: $operator")
     }
 }
 
-private fun Criteria.accept(predicate: Predicate): Criteria {
-    val (field, operator, values) = predicate
-    return if ((operator != Operator.IS_NULL || operator != Operator.IS_NOT_NULL) && values.isEmpty()) {
-        this
-    }
-    else {
-        and(field.toSnakeCase()).accept(predicate)
+fun resolveBigDecimalCondition(tableField: TableField<DoongjiHouseholdAccountsRecord, BigDecimal>, operator: Operator, values: List<BigDecimal>): Condition {
+    return when(operator) {
+        Operator.IS_NULL -> tableField.isNull
+        Operator.IS_NOT_NULL -> tableField.isNotNull
+        Operator.EQUALS -> if (values.size == 1) {
+            tableField.eq(values[0])
+        } else {
+            tableField.`in`(values)
+        }
+        Operator.NOT_EQUALS -> if (values.size == 1) {
+            tableField.ne(values[0])
+        } else {
+            tableField.notIn(values)
+        }
+        Operator.IN -> tableField.`in`(values)
+        Operator.NOT_IN -> tableField.notIn(values)
+        Operator.GREATER_THAN -> values.map { tableField.gt(it) }.reduce(Condition::or)
+        Operator.GREATER_THAN_EQUALS -> values.map { tableField.ge(it) }.reduce(Condition::or)
+        Operator.LESS_THAN -> values.map { tableField.lt(it) }.reduce(Condition::or)
+        Operator.LESS_THAN_EQUALS -> values.map { tableField.le(it) }.reduce(Condition::or)
+        else -> throw IllegalStateException("unsupported operator: $operator")
     }
 }
 
-private fun Criteria.CriteriaStep.accept(predicate: Predicate): Criteria {
-    val (field, operator, values) = predicate
-    return when (operator) {
-        Operator.IS_NULL -> isNull
-        Operator.IS_NOT_NULL -> isNotNull
-        Operator.EQUALS -> when {
-            values.size > 1 -> isIn(values)
-            else -> isEquals(values[0])
+fun resolveStringCondition(tableField: TableField<DoongjiHouseholdAccountsRecord, String>, operator: Operator, values: List<String>): Condition {
+    return when(operator) {
+        Operator.IS_NULL -> tableField.isNull
+        Operator.IS_NOT_NULL -> tableField.isNotNull
+        Operator.EQUALS -> if (values.size == 1) {
+            tableField.eq(values[0])
+        } else {
+            tableField.`in`(values)
         }
-        Operator.NOT_EQUALS -> when {
-            values.size > 1 -> notIn(values)
-            else -> not(values[0])
+        Operator.NOT_EQUALS -> if (values.size == 1) {
+            tableField.ne(values[0])
+        } else {
+            tableField.notIn(values)
         }
-        Operator.IN -> isIn(values)
-        Operator.NOT_IN -> notIn(values)
-        Operator.GREATER_THAN -> values.subList(1, values.size)
-                .fold(greaterThan(values[0])) { criteria, s -> criteria.or(field.toSnakeCase()).greaterThan(s) }
-        Operator.GREATER_THAN_EQUALS -> values.subList(1, values.size)
-                .fold(greaterThanOrEquals(values[0])) { criteria, s -> criteria.or(field.toSnakeCase()).greaterThanOrEquals(s) }
-        Operator.LESS_THAN -> values.subList(1, values.size)
-                .fold(lessThan(values[0])) { criteria, s -> criteria.or(field.toSnakeCase()).lessThan(s) }
-        Operator.LESS_THAN_EQUALS -> values.subList(1, values.size)
-                .fold(lessThanOrEquals(values[0])) { criteria, s -> criteria.or(field.toSnakeCase()).lessThanOrEquals(s) }
-        Operator.STARTS_WITH -> values.subList(1, values.size)
-                .fold(like("${values[0]}%")) { criteria, s -> criteria.or(field.toSnakeCase()).like("$s%") }
-        Operator.ENDS_WITH -> values.subList(1, values.size)
-                .fold(like("%${values[0]}")) { criteria, s -> criteria.or(field.toSnakeCase()).like("%$s") }
-        Operator.CONTAINS ->values.subList(1, values.size)
-                .fold(like("%${values[0]}%")) { criteria, s -> criteria.or(field.toSnakeCase()).like("%$s%") }
+        Operator.IN -> tableField.`in`(values)
+        Operator.NOT_IN -> tableField.notIn(values)
+        Operator.CONTAINS -> values.map { tableField.containsIgnoreCase(it) }.reduce(Condition::or)
+        Operator.STARTS_WITH -> values.map { tableField.startsWithIgnoreCase(it) }.reduce(Condition::or)
+        Operator.ENDS_WITH -> values.map { tableField.endsWithIgnoreCase(it) }.reduce(Condition::or)
+        else -> throw IllegalStateException("unsupported operator: $operator")
     }
 }
 
