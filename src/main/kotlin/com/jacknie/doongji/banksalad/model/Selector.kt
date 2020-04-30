@@ -11,7 +11,7 @@ data class Selector(
 data class Pagination(
         var page: Int,
         var size: Int,
-        var orders: Set<Order>?
+        var orders: List<Order>?
 )
 
 data class Order(

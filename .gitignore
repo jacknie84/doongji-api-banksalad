@@ -4,4 +4,7 @@
 # Ignore Gradle build output directory
 build
 
-.idea
+# Ignore generated source
+generated
+
+.idea/
