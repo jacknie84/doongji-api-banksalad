@@ -3,8 +3,8 @@ package com.jacknie.doongji.banksalad.config
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.jacknie.doongji.banksalad.endpoint.*
 import com.jacknie.doongji.banksalad.model.*
-import com.jacknie.fd.FileDelivery
-import com.jacknie.fd.fs.FsFileStoreSession
+import com.jacknie.filestore.FileStoreTemplate
+import com.jacknie.filestore.filesystem.FileSystemStoreSession
 import org.jooq.DSLContext
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Bean
@@ -27,13 +27,13 @@ class WebFluxConfiguration: WebFluxConfigurer {
     @Autowired private lateinit var modelRepository: ModelRepository
     @Autowired private lateinit var objectMapper: ObjectMapper
     @Autowired private lateinit var uploadFileRepository: UploadFileRepository
-    @Autowired private lateinit var fileDelivery: FileDelivery<FsFileStoreSession>
+    @Autowired private lateinit var fileStore: FileStoreTemplate<FileSystemStoreSession>
     @Autowired private lateinit var sharedExcelRepository: SharedExcelRepository
     @Autowired private lateinit var householdAccountsRepository: HouseholdAccountsRepository
     @Autowired private lateinit var retrievedConditionRepository: RetrievedConditionRepository
     @Autowired private lateinit var retrievedConditionPredicateRepository: RetrievedConditionPredicateRepository
-    @Bean fun uploadFileHandler() = UploadFileHandler(uploadFileRepository, fileDelivery)
-    @Bean fun downloadFileHandler() = DownloadFileHandler(uploadFileRepository, fileDelivery)
+    @Bean fun uploadFileHandler() = UploadFileHandler(uploadFileRepository, fileStore)
+    @Bean fun downloadFileHandler() = DownloadFileHandler(uploadFileRepository, fileStore)
     @Bean fun sharedExcelHandler() = SharedExcelsHandler(sharedExcelRepository)
     @Bean fun sharedExcelContentHandler() = SharedExcelContentHandler(householdAccountsRepository)
     @Bean fun householdAccountsHandler() = HouseholdAccountsHandler(modelRepository, householdAccountsRepository, objectMapper)

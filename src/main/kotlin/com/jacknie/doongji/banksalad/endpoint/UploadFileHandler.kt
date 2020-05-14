@@ -1,46 +1,56 @@
 package com.jacknie.doongji.banksalad.endpoint
 
-import com.jacknie.doongji.banksalad.config.FilePolicyImpl
 import com.jacknie.doongji.banksalad.model.UploadFile
 import com.jacknie.doongji.banksalad.model.UploadFileRepository
-import com.jacknie.fd.FileDelivery
-import com.jacknie.fd.FileSource
-import com.jacknie.fd.fs.FsFileStoreSession
+import com.jacknie.filestore.FileStoreSession
+import com.jacknie.filestore.FileStoreTemplate
+import com.jacknie.filestore.filesystem.FileSystemStoreSession
+import com.jacknie.filestore.model.*
+import com.jacknie.filestore.support.FileStoreLocatorBuilder
 import org.springframework.core.io.buffer.DataBuffer
 import org.springframework.http.MediaType
-import org.springframework.util.StringUtils
 import org.springframework.web.reactive.function.server.*
 import reactor.core.publisher.Mono
 import java.io.SequenceInputStream
+import java.time.LocalDate
 import java.util.*
 
 class UploadFileHandler(
         private val uploadFileRepository: UploadFileRepository,
-        private val fileDelivery: FileDelivery<FsFileStoreSession>) {
+        private val fileStore: FileStoreTemplate<FileSystemStoreSession>) {
+
+    private val uploadPolicy = UploadPolicy(
+            filesizeLimit = 10 * 1024 * 1024,
+            filenameExtCaseSensitive = false,
+            allowedMimeTypes = setOf(".+".toRegex()),
+            allowedFilenameExts = setOf("xlsx")
+    )
 
     fun put(request: ServerRequest): Mono<out ServerResponse> {
         val uploadPath = request.pathVariable("uploadPath").substring(1)
         val contentLength = request.headers().contentLengthOrNull()?: 0L
         val contentType = request.headers().contentTypeOrNull()?: MediaType.APPLICATION_OCTET_STREAM
-        val filename = request.queryParamOrNull("filename")?: extractFilenameAtHttpHeaders(request)?: "unknown"
+        val filename = Filename(request.queryParamOrNull("filename")?: extractFilenameAtHttpHeaders(request)?: "unknown")
         return request.bodyToFlux(DataBuffer::class.java)
                 .map { it.asInputStream() }
                 .collectList()
                 .map { SequenceInputStream(Collections.enumeration(it)) }
-                .map { FileSource(
+                .map { UploadSource(
                         content = it,
-                        extension = StringUtils.getFilenameExtension(filename).orEmpty(),
-                        storePath = uploadPath,
                         filename = filename,
-                        filesize = contentLength,
-                        mimeType = contentType.toString()
+                        mimType = contentType.toString(),
+                        filesize = contentLength
                 ) }
-                .map { fileDelivery.put(FilePolicyImpl(), it) }
+                .map { fileStore.save(it, uploadPolicy, FileStoreLocatorBuilder()
+                        .uploadDir(FileDirectory(uploadPath).resolve(LocalDate.now().toString()))
+                        .naming { Filename(UUID.randomUUID().toString(), filename.extension) }
+                        .build())
+                }
                 .map { UploadFile(
-                        path = "${it.path}/${it.filename}",
-                        filename = it.originalFilename,
-                        mimeType = it.mimeType.toString(),
-                        filesize = it.filesize
+                        path = it.toString(),
+                        filename = filename.toString(),
+                        mimeType = contentType.toString(),
+                        filesize = contentLength
                 ) }
                 .flatMap { uploadFileRepository.save(it) }
                 .flatMap { ServerResponse.ok().bodyValue(it) }

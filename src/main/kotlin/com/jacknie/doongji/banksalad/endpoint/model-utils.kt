@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.jacknie.doongji.banksalad.endpoint
 
 import com.jacknie.doongji.banksalad.model.Operator
@@ -12,7 +14,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
 import java.math.BigDecimal
 
-fun TableImpl<out Record>.selectedFields(selector: Selector): Collection<out SelectFieldOrAsterisk> = selector
+fun TableImpl<out Record>.selectedFields(selector: Selector): Collection<SelectFieldOrAsterisk> = selector
         .selectedFields
         ?.map { field(it.toSnakeCase().toUpperCase()) }
         ?: emptyList()
